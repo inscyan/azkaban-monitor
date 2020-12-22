@@ -33,7 +33,7 @@ def transform_date(timestamp):
 
 def get_current_time_history():
     # 需要修改
-    conn = pymysql.connect("localhost", "azkaban", "dd@2016", "azkaban")
+    conn = pymysql.connect("202.195.195.244", "azkaban", "azkaban", "azkaban")
 
     df = pd.read_sql('select * from execution_flows', conn)
     current_day = time.strftime("%Y-%m-%d", time.localtime()) + ' 00:00:00'
@@ -42,28 +42,27 @@ def get_current_time_history():
 
     df = df[df['start_time'].apply(lambda x: x * 0.001) >= float(timestamp)]
     df = df.groupby('flow_id').apply(lambda df: df.sort_values('start_time')[-1:]).reset_index(drop=True)
-    df['start_time'] = df['start_time'].apply(transform_date)
-    df['end_time'] = df['end_time'].apply(transform_date)
+    # df['start_time'] = df['start_time'].apply(transform_date)
+    # df['end_time'] = df['end_time'].apply(transform_date)
 
     current_time_succeed = []
+    running = []
     current_time_no_succeed = []
     for idx, row in df.iterrows():
-        tmp_flow = {'exec_id': row['exec_id'],
-                    'flow_id': row['flow_id'],
-                    'start_time': row['start_time'],
-                    'end_time': row['end_time'],
-                    'status': azkaban_status_codes[row['status']]}
+        tmp_flow = {'flow_id': row['flow_id']}
         if row['status'] == 50:
             current_time_succeed.append(tmp_flow)
+        elif row['status'] == 30:
+            running.append(tmp_flow)
         else:
             current_time_no_succeed.append(tmp_flow)
 
     conn.close()
 
-    return current_time_succeed, current_time_no_succeed
+    return current_time_succeed, running, current_time_no_succeed
 
 
-def send_dingding(current_time_succeed, current_time_no_succeed):
+def send_dingding(current_time_succeed, running, current_time_no_succeed):
     current_day = time.strftime("%Y-%m-%d", time.localtime())
 
     pkl_path = os.path.join(root_abs_path, 'next_day_flows/{}.pkl'.format(current_day))
@@ -82,9 +81,9 @@ def send_dingding(current_time_succeed, current_time_no_succeed):
     }
 
     # 需要修改
-    sub_send1 = '【江海大】{}\n'.format(current_day)
+    sub_send1 = '【江科大本部】{}\n'.format(current_day)
 
-    sub_send3 = '\n成功{}个，非成功{}个\n'.format(len(current_time_succeed), len(current_time_no_succeed))
+    sub_send3 = '\n成功{}个，执行中{}个，非成功{}个\n'.format(len(current_time_succeed), len(running), len(current_time_no_succeed))
     if len(current_time_no_succeed) > 0:
         sub_send3 += '\n非成功作业名：\n' + '\n'.join([i['flow_id'] for i in current_time_no_succeed]) + '\n\n请及时处理'
 
@@ -106,6 +105,18 @@ def send_dingding(current_time_succeed, current_time_no_succeed):
         logging.debug(response.text)
     except Exception as e:
         logging.critical('POST {}'.format(e))
+        time.sleep(300)
+        try:
+            response = requests.post(url=webhook, headers=headers, data=message_json)
+            logging.debug(response.text)
+        except Exception as e:
+            logging.critical('POST {}'.format(e))
+            time.sleep(300)
+            try:
+                response = requests.post(url=webhook, headers=headers, data=message_json)
+                logging.debug(response.text)
+            except Exception as e:
+                logging.critical('POST {}'.format(e))
 
     logging.info('\n')
 
@@ -116,9 +127,9 @@ def main():
                         format='%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s',
                         level=logging.DEBUG, )
 
-    current_time_succeed, current_time_no_succeed = get_current_time_history()
+    current_time_succeed, running, current_time_no_succeed = get_current_time_history()
 
-    send_dingding(current_time_succeed, current_time_no_succeed)
+    send_dingding(current_time_succeed, running, current_time_no_succeed)
 
     fa.close()
 

@@ -19,8 +19,8 @@ requests.packages.urllib3.disable_warnings()
 
 def main():
     # 需要修改
-    login_url = 'http://node-1:8081/'
-    schedule_url = 'http://node-1:8081/schedule'
+    login_url = 'https://cdh-master:8443/'
+    schedule_url = 'https://cdh-master:8443/schedule'
 
     session = requests.session()
     headers = {
@@ -29,7 +29,7 @@ def main():
 
     try:
         # 需要修改
-        post_data = {'action': 'login', 'username': 'azkaban', 'password': 'dd@2016'}
+        post_data = {'action': 'login', 'username': 'azkaban', 'password': 'azkaban'}
 
         response = session.post(login_url, headers=headers, data=post_data, verify=False)
         if response.status_code == 200:
