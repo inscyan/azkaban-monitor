@@ -83,7 +83,10 @@ def send_dingding(current_time_succeed, running, current_time_no_succeed):
     # 需要修改
     sub_send1 = '【江科大本部】{}\n'.format(current_day)
 
-    sub_send3 = '\n成功{}个，执行中{}个，非成功{}个\n'.format(len(current_time_succeed), len(running), len(current_time_no_succeed))
+    if len(running) == 0:
+        sub_send3 = '\n成功{}个，非成功{}个\n'.format(len(current_time_succeed), len(current_time_no_succeed))
+    else:
+        sub_send3 = '\n成功{}个，执行中{}个，非成功{}个\n'.format(len(current_time_succeed), len(running), len(current_time_no_succeed))
     if len(current_time_no_succeed) > 0:
         sub_send3 += '\n非成功作业名：\n' + '\n'.join([i['flow_id'] for i in current_time_no_succeed]) + '\n\n请及时处理'
 
