@@ -6,7 +6,6 @@ import logging
 
 import pymysql
 import pandas as pd
-
 import requests
 
 root_abs_path = os.path.dirname(os.path.abspath(__file__))
@@ -33,7 +32,7 @@ def transform_date(timestamp):
 
 def get_current_time_history():
     # 需要修改
-    conn = pymysql.connect("202.195.195.244", "azkaban", "azkaban", "azkaban")
+    conn = pymysql.connect(host="host", user="azkaban", password="azkaban", database="azkaban")  # host: Azkaban数据库所在IP
 
     df = pd.read_sql('select * from execution_flows', conn)
     current_day = time.strftime("%Y-%m-%d", time.localtime()) + ' 00:00:00'
@@ -41,7 +40,7 @@ def get_current_time_history():
     timestamp = time.mktime(time_array)
 
     df = df[df['start_time'].apply(lambda x: x * 0.001) >= float(timestamp)]
-    df = df.groupby('flow_id').apply(lambda df: df.sort_values('start_time')[-1:]).reset_index(drop=True)
+    df = df.groupby('flow_id').apply(lambda sub_df: sub_df.sort_values('start_time')[-1:]).reset_index(drop=True)
     # df['start_time'] = df['start_time'].apply(transform_date)
     # df['end_time'] = df['end_time'].apply(transform_date)
 
@@ -73,22 +72,24 @@ def send_dingding(current_time_succeed, running, current_time_no_succeed):
     else:
         sub_send2 = '未成功爬取调度页面'
 
-    webhook = 'https://oapi.dingtalk.com/robot/send?access_token=54b0e4bb64db2405ac9825f6f206a96964a1c70bc081c9e19b2a2de0067fe519'  # 真实
-    webhook = 'https://oapi.dingtalk.com/robot/send?access_token=358174882e9f8e952813a6061eae7206d8ef40a530437acd7882b2cb4b24b4e3'  # 测试
+    webhook = '钉钉报警群机器人webhook'  # 真实
+    # webhook = '钉钉报警测试群机器人webhook'  # 测试
+
     headers = {
         "Content-Type": "application/json",
         "Charset": "UTF-8"
     }
 
     # 需要修改
-    sub_send1 = '【江科大本部】{}\n'.format(current_day)
+    sub_send1 = '【标题】{}'.format(current_day)
 
     if len(running) == 0:
-        sub_send3 = '\n成功{}个，非成功{}个\n'.format(len(current_time_succeed), len(current_time_no_succeed))
+        sub_send3 = '成功{}个，非成功{}个\n'.format(len(current_time_succeed), len(current_time_no_succeed))
     else:
-        sub_send3 = '\n成功{}个，执行中{}个，非成功{}个\n'.format(len(current_time_succeed), len(running), len(current_time_no_succeed))
+        sub_send3 = '成功{}个，执行中{}个，非成功{}个\n'.format(len(current_time_succeed), len(running),
+                                                   len(current_time_no_succeed))
     if len(current_time_no_succeed) > 0:
-        sub_send3 += '\n非成功作业名：\n' + '\n'.join([i['flow_id'] for i in current_time_no_succeed]) + '\n\n请及时处理'
+        sub_send3 += '非成功作业名：\n' + '\n'.join([i['flow_id'] for i in current_time_no_succeed]) + '\n请及时处理~'
 
     send = '\n'.join([sub_send1, sub_send2, sub_send3])
     message = {
@@ -103,6 +104,7 @@ def send_dingding(current_time_succeed, running, current_time_no_succeed):
     }
     message_json = json.dumps(message)
 
+    # 失败重试3次，有更优雅写法
     try:
         response = requests.post(url=webhook, headers=headers, data=message_json)
         logging.debug(response.text)
@@ -132,7 +134,11 @@ def main():
 
     current_time_succeed, running, current_time_no_succeed = get_current_time_history()
 
-    send_dingding(current_time_succeed, running, current_time_no_succeed)
+    if len(current_time_no_succeed) > 0:  # 有失败作业即告警
+        send_dingding(current_time_succeed, running, current_time_no_succeed)
+    else:
+        logging.debug(
+            '成功{}个，执行中{}个，非成功{}个\n\n'.format(len(current_time_succeed), len(running), len(current_time_no_succeed)))
 
     fa.close()
 

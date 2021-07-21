@@ -19,8 +19,8 @@ requests.packages.urllib3.disable_warnings()
 
 def main():
     # 需要修改
-    login_url = 'https://cdh-master:8443/'
-    schedule_url = 'https://cdh-master:8443/schedule'
+    login_url = 'https://host:port/'  # host: Azkaban所在服务器
+    schedule_url = 'https://host:port/schedule'  # Azkaban的调度页面，需爬取；host: Azkaban所在服务器
 
     session = requests.session()
     headers = {
@@ -29,7 +29,7 @@ def main():
 
     try:
         # 需要修改
-        post_data = {'action': 'login', 'username': 'azkaban', 'password': 'azkaban'}
+        post_data = {'action': 'login', 'username': 'azkaban', 'password': 'azkaban'}  # Azkaban登录界面账号密码
 
         response = session.post(login_url, headers=headers, data=post_data, verify=False)
         if response.status_code == 200:
